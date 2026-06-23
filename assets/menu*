@@ -1,0 +1,92 @@
+import pygame
+import sys
+
+pygame.init()
+
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Meu Jogo")
+
+# Cores
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY  = (180, 180, 180)
+
+# Fontes
+font_title = pygame.font.SysFont("arial", 64, bold=True)
+font_menu  = pygame.font.SysFont("arial", 36)
+
+# Logo (imagem) — opcional
+logo = pygame.image.load("ChatGPT Image 23 de jun. de 2026, 19_41_29.png")          # remova se não tiver
+logo = pygame.transform.scale(logo, (200, 200))
+
+clock = pygame.time.Clock()
+
+
+def draw_text(text, font, color, surface, x, y, center=True):
+    img = font.render(text, True, color)
+    rect = img.get_rect()
+    if center:
+        rect.center = (x, y)
+    surface.blit(img, rect)
+
+
+def menu():
+    opcoes = ["Jogar", "Opções", "Sair"]
+    selecionado = 0
+
+    while True:
+        screen.fill(BLACK)
+
+        # Logo
+        screen.blit(logo, (WIDTH // 2 - logo.get_width() // 2, 40))
+
+        # Título (use se não tiver logo)
+        # draw_text("MEU JOGO", font_title, WHITE, screen, WIDTH // 2, 80)
+
+        # Opções do menu
+        for i, opcao in enumerate(opcoes):
+            cor = WHITE if i == selecionado else GRAY
+            draw_text(opcao, font_menu, cor, screen, WIDTH // 2, 320 + i * 60)
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selecionado = (selecionado - 1) % len(opcoes)
+                if event.key == pygame.K_DOWN:
+                    selecionado = (selecionado + 1) % len(opcoes)
+                if event.key == pygame.K_RETURN:
+                    if selecionado == 0: return "jogar"
+                    if selecionado == 1: return "opcoes"
+                    if selecionado == 2: pygame.quit(); sys.exit()
+
+        clock.tick(60)
+
+
+def jogo():
+    running = True
+    while running:
+        screen.fill((30, 30, 60))
+        draw_text("Jogo rodando! ESC para voltar", font_menu, WHITE, screen, WIDTH // 2, HEIGHT // 2)
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+        clock.tick(60)
+
+
+# --- Loop principal ---
+while True:
+    resultado = menu()
+    if resultado == "jogar":
+        jogo()
