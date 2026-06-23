@@ -25,47 +25,37 @@ Velocidade = 5
 
 # LAYOUT  (de baixo para cima)
 
-#Corredor Geral
-CL, CA = 128, 96          # corredor padrão
-CL2    = 384              # altura do corredor largo (antes da sala final)
+CL, CA = 128, 96
+CL2    = 384
 
-# Sala pequena início
 SP_L, SP_A = 512, 384
 SP_x = (largura_mundo - SP_L) // 2
 SP_y = altura_mundo - SP_A
 
-# Corredor 1 (SP - SG)
 C1_x = (largura_mundo - CL) // 2
 C1_y = SP_y - CA
 
-# Sala grande
 SG_L, SG_A = 1536, 1152
 SG_x = (largura_mundo - SG_L) // 2
 SG_y = C1_y - SG_A
 
-# Corredor 2 (SG - SM)
 C2_x = (largura_mundo - CL) // 2
 C2_y = SG_y - CA
 
-# Sala média
 SM_L, SM_A = 1024, 768
 SM_x = (largura_mundo - SM_L) // 2
 SM_y = C2_y - SM_A
 
-# Corredor 3 (SM - SP2)
 C3_x = (largura_mundo - CL) // 2
 C3_y = SM_y - CA
 
-# Sala pequena 2
 SP2_L, SP2_A = 512, 384
 SP2_x = (largura_mundo - SP2_L) // 2
 SP2_y = C3_y - SP2_A
 
-# Corredor largo (SP2 - SF)
 CL_x = (largura_mundo - CL) // 2
 CL_y = SP2_y - CL2
 
-# Sala grande final
 SF_L, SF_A = 1536, 1152
 SF_x = (largura_mundo - SF_L) // 2
 SF_y = CL_y - SF_A
@@ -109,8 +99,6 @@ class Muro(pygame.sprite.Sprite):
 def paredes(sx, sy, sl, sa,
             ab_topo=None, ab_base=None,
             ab_esq=None,  ab_dir=None):
-    #Cria muros em torno de uma sala/corredor com aberturas.
-    #ab_* = (ini, fim).
     for x in range(sx - AZULEJO, sx + sl + AZULEJO, AZULEJO):
         if ab_topo is None or not (ab_topo[0] <= x < ab_topo[1]):
             muro_group.add(Muro(x, sy - AZULEJO))
@@ -123,43 +111,25 @@ def paredes(sx, sy, sl, sa,
             muro_group.add(Muro(sx + sl, y))
 
 def corredor_v(cx, cy, cl, ca):
-    #Corredor vertical: só paredes laterais (topo/base abertos para as salas).
     for y in range(cy, cy + ca, AZULEJO):
         muro_group.add(Muro(cx - AZULEJO, y))
         muro_group.add(Muro(cx + cl,   y))
 
-# Sala pequena início — abre topo para C1
 paredes(SP_x, SP_y, SP_L, SP_A,
         ab_topo=(C1_x, C1_x + CL))
-
-# Corredor 1
 corredor_v(C1_x, C1_y, CL, CA)
-
-# Sala grande — abre base (C1) e topo (C2)
 paredes(SG_x, SG_y, SG_L, SG_A,
         ab_base=(C1_x, C1_x + CL),
         ab_topo=(C2_x, C2_x + CL))
-
-# Corredor 2
 corredor_v(C2_x, C2_y, CL, CA)
-
-# Sala média — abre base (C2) e topo (C3)
 paredes(SM_x, SM_y, SM_L, SM_A,
         ab_base=(C2_x, C2_x + CL),
         ab_topo=(C3_x, C3_x + CL))
-
-# Corredor 3
 corredor_v(C3_x, C3_y, CL, CA)
-
-# Sala pequena 2 — abre base (C3) e topo (corredor largo)
 paredes(SP2_x, SP2_y, SP2_L, SP2_A,
         ab_base=(C3_x, C3_x + CL),
         ab_topo=(CL_x, CL_x + CL))
-
-# Corredor largo
 corredor_v(CL_x, CL_y, CL, CL2)
-
-# Sala grande final — abre base (corredor largo), topo fechado
 paredes(SF_x, SF_y, SF_L, SF_A,
         ab_base=(CL_x, CL_x + CL))
 
@@ -173,9 +143,12 @@ class Pato(pygame.sprite.Sprite):
         self.rect  = self.image.get_rect()
         self.rect.x = SP_x + SP_L // 2
         self.rect.y = SP_y + SP_A // 2
-        self.vida        = 300
-        self.invensivel  = 0
+        self.vida         = 300
+        self.invensivel   = 0
         self.ataque_timer = 0
+        self.tempo_recuo  = 0
+        self.vel_x        = 0.0   # knockback
+        self.vel_y        = 0.0
 
 Pato_group = pygame.sprite.Group()
 pato = Pato()
@@ -188,7 +161,10 @@ class Galinha(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.image.load("assets/Inimigos/Galinha.png")
         self.rect  = self.image.get_rect()
-        self.vida  = 1
+        self.vida        = 1
+        self.vel_x       = 0.0   # knockback
+        self.vel_y       = 0.0
+        self.tempo_recuo = 0
 
 for i in range(5):
     galinha = Galinha()
@@ -203,8 +179,10 @@ class Galo(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.image.load("assets/Inimigos/Galo.png")
         self.rect  = self.image.get_rect()
-        self.vida  = 2
+        self.vida        = 2
         self.tempo_recuo = 0
+        self.vel_x       = 0.0   # knockback
+        self.vel_y       = 0.0
 
 for i in range(3):
     galo = Galo()
@@ -227,6 +205,11 @@ class Ovo(pygame.sprite.Sprite):
 
 tempo_ovo = 0
 
+# Força dos knockbacks
+KB_PATO    = 8    # força ao pato (galo/ovo → pato)
+KB_INIMIGO = 10   # força nos inimigos (pato → galinha/galo)
+FRICCAO    = 0.75 # decaimento por frame
+
 
 # LOOP PRINCIPAL
 
@@ -239,20 +222,36 @@ while rodando:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             pato.ataque_timer = 10
 
-    # 2. Ataque
+    # 2. Ataque — dano + knockback nos inimigos
     if pato.ataque_timer > 0:
         area = pygame.Rect(pato.rect.centerx - 50, pato.rect.centery - 50, 100, 100)
-        for g in Galinha_group:
-            if area.colliderect(g.rect): g.vida -= 1
-        for g in Galo_group:
-            if area.colliderect(g.rect): g.vida -= 1
+        for galinha in Galinha_group:
+            if area.colliderect(galinha.rect):
+                galinha.vida -= 1
+                # knockback da galinha para longe do pato
+                dx = galinha.rect.centerx - pato.rect.centerx
+                dy = galinha.rect.centery - pato.rect.centery
+                dist = (dx**2 + dy**2) ** 0.5 or 1
+                galinha.vel_x = dx / dist * KB_INIMIGO
+                galinha.vel_y = dy / dist * KB_INIMIGO
+                galinha.tempo_recuo = 15
+        for galo in Galo_group:
+            if area.colliderect(galo.rect):
+                galo.vida -= 1
+                # knockback do galo para longe do pato
+                dx = galo.rect.centerx - pato.rect.centerx
+                dy = galo.rect.centery - pato.rect.centery
+                dist = (dx**2 + dy**2) ** 0.5 or 1
+                galo.vel_x = dx / dist * KB_INIMIGO
+                galo.vel_y = dy / dist * KB_INIMIGO
+                galo.tempo_recuo = 30
         pato.ataque_timer -= 1
 
     # 3. Imunidade
     if pato.invensivel > 0:
         pato.invensivel -= 1
 
-    # 4. Movimento pato
+    # 4. Movimento pato (input + knockback)
     tecla = pygame.key.get_pressed()
     vx = vy = 0
     if tecla[pygame.K_d] or tecla[pygame.K_RIGHT]:  vx =  Velocidade
@@ -260,21 +259,29 @@ while rodando:
     if tecla[pygame.K_w] or tecla[pygame.K_UP]:     vy = -Velocidade
     if tecla[pygame.K_s] or tecla[pygame.K_DOWN]:   vy =  Velocidade
 
-    # Colisão parede
-    # Salva movimento anterior
+    # soma input + knockback
+    vx += pato.vel_x
+    vy += pato.vel_y
+    pato.vel_x *= FRICCAO
+    pato.vel_y *= FRICCAO
+    if abs(pato.vel_x) < 0.1: pato.vel_x = 0
+    if abs(pato.vel_y) < 0.1: pato.vel_y = 0
+
     anterior_x, anterior_y = pato.rect.x, pato.rect.y
     pato.rect.x += vx
     pato.rect.y += vy
 
     for m in muro_group:
         if pato.rect.colliderect(m.rect):
-            pato.rect.x, pato.rect.y = anterior_x, anterior_y; break
+            pato.rect.x, pato.rect.y = anterior_x, anterior_y
+            pato.vel_x = pato.vel_y = 0
+            break
 
-    for g in Galinha_group:
-        if pato.rect.colliderect(g.rect):
-            pato.rect.x, pato.rect.y = anterior_x, anterior_y; break
-
-    # Borda do mundo
+    for galinha in Galinha_group:
+        if pato.rect.colliderect(galinha.rect):
+            pato.rect.x, pato.rect.y = anterior_x, anterior_y
+            pato.vel_x = pato.vel_y = 0
+            break
 
     pato.rect.left   = max(0, pato.rect.left)
     pato.rect.right  = min(largura_mundo, pato.rect.right)
@@ -287,49 +294,100 @@ while rodando:
 
     # 6. Galinhas
     for galinha in Galinha_group:
-        if g.vida <= 0: g.kill(); continue              #vida
-        dx = pato.rect.centerx - g.rect.centerx         #vetorial para distancia
-        dy = pato.rect.centery - g.rect.centery
+        if galinha.vida <= 0: galinha.kill(); continue
+
+        dx = pato.rect.centerx - galinha.rect.centerx
+        dy = pato.rect.centery - galinha.rect.centery
         dist = (dx**2 + dy**2) ** 0.5
         if dist == 0: continue
-        galinha_x, galinha_y = galinha.rect.x, galinha.rect.y       #Guarda posição
-        dist_seg = 200
-        if dist > dist_seg + 20:
-            galinha.rect.x += dx / dist; galinha.rect.y += dy / dist
-        elif dist < dist_seg - 20:
-            galinha.rect.x -= dx / dist; galinha.rect.y -= dy / dist
+
+        galinha_x, galinha_y = galinha.rect.x, galinha.rect.y
+        dist_seg = 100
+
+        # movimento de orbita/fuga (só quando não está em knockback)
+        if galinha.tempo_recuo <= 0:
+            if dist >= dist_seg + 30:
+                galinha.rect.x += 1 if pygame.time.get_ticks() // 500 % 2 == 0 else -1
+            elif dist > dist_seg + 20:
+                galinha.rect.x += dx / dist
+                galinha.rect.y += dy / dist
+            elif dist < dist_seg - 20:
+                galinha.rect.x -= dx / dist
+                galinha.rect.y -= dy / dist
+            else:
+                galinha.rect.x += -dy / dist
+                galinha.rect.y += dx / dist
         else:
-            galinha.rect.x += -dy / dist; galinha.rect.y += dx / dist
+            galinha.tempo_recuo -= 1
+
+        # aplica knockback
+        galinha.rect.x += galinha.vel_x
+        galinha.rect.y += galinha.vel_y
+        galinha.vel_x *= FRICCAO
+        galinha.vel_y *= FRICCAO
+        if abs(galinha.vel_x) < 0.1: galinha.vel_x = 0
+        if abs(galinha.vel_y) < 0.1: galinha.vel_y = 0
+
         for m in muro_group:
             if galinha.rect.colliderect(m.rect):
-                galinha.rect.x, galinha.rect.y = galinha_x, galinha_y; break
-        galinha.rect.left   = max(0, g.rect.left)
-        galinha.rect.right  = min(largura_mundo, g.rect.right)
-        galinha.rect.top    = max(0, g.rect.top)
-        galinha.rect.bottom = min(altura_mundo, g.rect.bottom)
+                galinha.rect.x, galinha.rect.y = galinha_x, galinha_y
+                galinha.vel_x = galinha.vel_y = 0
+                break
+        galinha.rect.left   = max(0, galinha.rect.left)
+        galinha.rect.right  = min(largura_mundo, galinha.rect.right)
+        galinha.rect.top    = max(0, galinha.rect.top)
+        galinha.rect.bottom = min(altura_mundo, galinha.rect.bottom)
 
-    # 7. Galos
+    # 7. Galo
     for galo in Galo_group:
-        if galo.vida <= 0: galo.kill(); continue            #vida galo
-        dx = pato.rect.centerx - galo.rect.centerx          #outra vetorial para distancia
+        if galo.vida <= 0: galo.kill(); continue
+
+        dx = pato.rect.centerx - galo.rect.centerx
         dy = pato.rect.centery - galo.rect.centery
         dist = (dx**2 + dy**2) ** 0.5
-        galo_x, galo_y = galo.rect.x, galo.rect.y           #guarda posição
+        galo_x, galo_y = galo.rect.x, galo.rect.y
+
         if dist > 0:
             if galo.tempo_recuo > 0:
-                galo.rect.x -= dx / dist; g.rect.y -= dy / dist
+                # movimento de recuo (IA) — separado do knockback físico
+                galo.rect.x -= dx / dist
+                galo.rect.y -= dy / dist
                 galo.tempo_recuo -= 1
             else:
-                galo.rect.x += dx / dist * 2; galo.rect.y += dy / dist * 2
+                galo.rect.x += dx / dist * 2
+                galo.rect.y += dy / dist * 2
+
+        # aplica knockback físico
+        galo.rect.x += galo.vel_x
+        galo.rect.y += galo.vel_y
+        galo.vel_x *= FRICCAO
+        galo.vel_y *= FRICCAO
+        if abs(galo.vel_x) < 0.1: galo.vel_x = 0
+        if abs(galo.vel_y) < 0.1: galo.vel_y = 0
+
         for m in muro_group:
             if galo.rect.colliderect(m.rect):
-                galo.rect.x, galo.rect.y = galo_x, galo_y; break
-        galo.rect.left   = max(0, g.rect.left)
-        galo.rect.right  = min(largura_mundo, g.rect.right)
-        galo.rect.top    = max(0, g.rect.top)
-        galo.rect.bottom = min(altura_mundo, g.rect.bottom)
+                galo.rect.x, galo.rect.y = galo_x, galo_y
+                galo.vel_x = galo.vel_y = 0
+                break
+
+        galo.rect.left   = max(0, galo.rect.left)
+        galo.rect.right  = min(largura_mundo, galo.rect.right)
+        galo.rect.top    = max(0, galo.rect.top)
+        galo.rect.bottom = min(altura_mundo, galo.rect.bottom)
+
+        # colisão com pato — dano + knockback no pato
         if galo.rect.colliderect(pato.rect) and pato.invensivel == 0:
-            pato.vida -= 1; pato.invensivel = 60; g.tempo_recuo = 30
+            pato.vida -= 1
+            pato.invensivel = 60
+            # vetor pato ← galo
+            kx = pato.rect.centerx - galo.rect.centerx
+            ky = pato.rect.centery - galo.rect.centery
+            kdist = (kx**2 + ky**2) ** 0.5 or 1
+            pato.vel_x = kx / kdist * KB_PATO
+            pato.vel_y = ky / kdist * KB_PATO
+            for g in Galo_group:
+                g.tempo_recuo = 60
             print("Vida:", pato.vida)
 
     # 8. Ovos
@@ -338,7 +396,14 @@ while rodando:
         ovo.rect.y += ovo.vel_y
         if pato.rect.colliderect(ovo.rect):
             if pato.invensivel == 0:
-                pato.vida -= 1; pato.invensivel = 30
+                pato.vida -= 1
+                pato.invensivel = 30
+                # knockback na direção do ovo
+                kx = pato.rect.centerx - ovo.rect.centerx
+                ky = pato.rect.centery - ovo.rect.centery
+                kdist = (kx**2 + ky**2) ** 0.5 or 1
+                pato.vel_x = kx / kdist * KB_PATO
+                pato.vel_y = ky / kdist * KB_PATO
                 print("Vida:", pato.vida)
             ovo.kill(); continue
         if (ovo.rect.right < 0 or ovo.rect.left > largura_mundo or
@@ -346,11 +411,21 @@ while rodando:
             ovo.kill()
 
     tempo_ovo += 1
-    if tempo_ovo >= 180:
-        for g in Galinha_group:
-            ovo_group.add(Ovo(g.rect.centerx, g.rect.centery,
-                              pato.rect.centerx, pato.rect.centery))
+    if tempo_ovo >= 150:
+        for galinha in Galinha_group:
+            dx = pato.rect.centerx - galinha.rect.centerx
+            dy = pato.rect.centery - galinha.rect.centery
+            dist = (dx ** 2 + dy ** 2) ** 0.5
+            if dist == 0: continue
+            if dist <= 300:
+                ovo_group.add(Ovo(galinha.rect.centerx, galinha.rect.centery,
+                                  pato.rect.centerx, pato.rect.centery))
         tempo_ovo = 0
+
+    for m in muro_group:
+        for ovo in ovo_group:
+            if ovo.rect.colliderect(m.rect):
+                ovo.kill()
 
     if pato.vida <= 0:
         rodando = False
@@ -364,10 +439,10 @@ while rodando:
         if -AZULEJO < sx < largura and -AZULEJO < sy < altura:
             tela.blit(m.image, (sx, sy))
 
-    for s in Galinha_group:
-        tela.blit(s.image, (s.rect.x - cam_x, s.rect.y - cam_y))
-    for s in Galo_group:
-        tela.blit(s.image, (s.rect.x - cam_x, s.rect.y - cam_y))
+    for galinha in Galinha_group:
+        tela.blit(galinha.image, (galinha.rect.x - cam_x, galinha.rect.y - cam_y))
+    for galo in Galo_group:
+        tela.blit(galo.image, (galo.rect.x - cam_x, galo.rect.y - cam_y))
     for ovo in ovo_group:
         tela.blit(ovo.image, (ovo.rect.x - cam_x, ovo.rect.y - cam_y))
 
