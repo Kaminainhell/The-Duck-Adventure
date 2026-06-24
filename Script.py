@@ -1,32 +1,26 @@
 import pygame
+import sys
 from menu import menu
 from intro import intro
+from gameover import game_over
 
-
+# INICIALIZAÇÃO
 pygame.init()
 pygame.mixer.init()
 
-pygame.mixer.music.load("assets/Musica/Musica_fundo-192kbps.mp3")
-pygame.mixer.music.set_volume(0.4)
-pygame.mixer.music.play(-1)
 
-try:
-    pygame.mixer.init()
-    print("Mixer iniciado")
-except Exception as e:
-    print(e)
 
-#  Tela
+# Tela
 largura = 800
 altura  = 600
 
-#  Mundo
+# Mundo
 largura_mundo = 4000
 altura_mundo  = 6000
 
 AZULEJO = 32
 
-# Assets
+# Assets de ambiente
 chao_azulejo = pygame.image.load("assets/ambiente/Chao2.png")
 muro_img     = pygame.image.load("assets/ambiente/muro.png")
 
@@ -35,10 +29,45 @@ pygame.display.set_caption("pato")
 fonte   = pygame.font.SysFont(None, 36)
 fonte_p = pygame.font.SysFont(None, 28)
 clock   = pygame.time.Clock()
-rodando = True
-Velocidade = 5
 
-# LAYOUT
+
+
+altura_jogo = altura
+
+# Vaida
+caixa_dialogo_img = pygame.image.load("assets/Titulo/vaida.png").convert_alpha()
+
+
+
+# CONSTANTES DO JOGO
+
+Velocidade             = 5
+KB_PATO                = 10
+KB_INIMIGO             = 10
+FRICCAO                = 0.75
+DIST_ALERTA            = 225
+PATROL_RANGE           = 80
+ANIM_SPEED             = 12
+DASH_FORCA             = 15
+DASH_COOLDOWN_NORM     = 90
+DASH_COOLDOWN_FUR      = 20
+DASH_DURACAO           = 12
+DASH_POS_INVUL         = 12
+FURIA_DURACAO          = 240
+FURIA_BONUS_KILLS      = 30
+FURIA_VEL_MULT         = 1.5
+FURIA_DANO_DASH        = 2
+SEQUENCIA_BOOST        = 10
+VEL_BOOST_KILLS        = 2
+CURA_QUANTIDADE        = 5
+DANO_FLASH_DUR         = 8
+
+# Distância para indicador princesa
+DIST_INTERACAO_PRINCESA = 70
+
+
+# LAYOUT DO MUNDO
+
 CL, CA = 128, 96
 CL2    = 384
 
@@ -74,7 +103,10 @@ SF_L, SF_A = 1536, 1152
 SF_x = (largura_mundo - SF_L) // 2
 SF_y = CL_y - SF_A
 
+
+
 # CHÃO PRÉ-RENDERIZADO
+
 chao_surface = pygame.Surface((largura_mundo, altura_mundo), pygame.SRCALPHA)
 chao_surface.fill((0, 0, 0, 0))
 regioes = [
@@ -93,16 +125,20 @@ for rx, ry, rw, rh in regioes:
         for y in range(ry, ry + rh, AZULEJO):
             chao_surface.blit(chao_azulejo, (x, y))
 
+
 # MUROS
+
 muro_group = pygame.sprite.Group()
+
 
 class Muro(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = muro_img.convert_alpha()
-        self.rect  = self.image.get_rect()
+        self.image  = muro_img.convert_alpha()
+        self.rect   = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+
 
 def paredes(sx, sy, sl, sa, ab_topo=None, ab_base=None, ab_esq=None, ab_dir=None):
     for x in range(sx - AZULEJO, sx + sl + AZULEJO, AZULEJO):
@@ -116,15 +152,18 @@ def paredes(sx, sy, sl, sa, ab_topo=None, ab_base=None, ab_esq=None, ab_dir=None
         if ab_dir is None or not (ab_dir[0] <= y < ab_dir[1]):
             muro_group.add(Muro(sx + sl, y))
 
+
 def corredor_v(cx, cy, cl, ca):
     for y in range(cy, cy + ca, AZULEJO):
         muro_group.add(Muro(cx - AZULEJO, y))
         muro_group.add(Muro(cx + cl, y))
 
+
 def bloco_muros(ox, oy, colunas=3, linhas=3):
     for col in range(colunas):
         for lin in range(linhas):
             muro_group.add(Muro(ox + col * AZULEJO, oy + lin * AZULEJO))
+
 
 paredes(SP_x,  SP_y,  SP_L,  SP_A,  ab_topo=(C1_x, C1_x + CL))
 corredor_v(C1_x, C1_y, CL, CA)
@@ -136,9 +175,9 @@ paredes(SP2_x, SP2_y, SP2_L, SP2_A, ab_base=(C3_x, C3_x + CL), ab_topo=(CL_x, CL
 corredor_v(CL_x, CL_y, CL, CL2)
 paredes(SF_x,  SF_y,  SF_L,  SF_A,  ab_base=(CL_x, CL_x + CL))
 
-bloco_muros(SG_x,                    SG_y)
+bloco_muros(SG_x,                     SG_y)
 bloco_muros(SG_x + SG_L - 3*AZULEJO, SG_y)
-bloco_muros(SG_x,                    SG_y + SG_A - 3*AZULEJO)
+bloco_muros(SG_x,                     SG_y + SG_A - 3*AZULEJO)
 bloco_muros(SG_x + SG_L - 3*AZULEJO, SG_y + SG_A - 3*AZULEJO)
 
 muro_meio_y = SP_y + SP_A // 2 - AZULEJO // 2
@@ -146,29 +185,9 @@ muro_meio_x = SP_x + (SP_L - 384) // 2
 for col in range(384 // AZULEJO):
     muro_group.add(Muro(muro_meio_x + col * AZULEJO, muro_meio_y))
 
-# CONSTANTES
-KB_PATO            = 10
-KB_INIMIGO         = 10
-FRICCAO            = 0.75
-DIST_ALERTA        = 225
-PATROL_RANGE       = 80
-ANIM_SPEED         = 12
-DASH_FORCA         = 15
-DASH_COOLDOWN_NORM = 90
-DASH_COOLDOWN_FUR  = 20
-DASH_DURACAO       = 8
-DASH_POS_INVUL     = 10
-FURIA_DURACAO      = 240
-FURIA_BONUS_KILLS  = 30
-FURIA_VEL_MULT     = 1.5
-FURIA_DANO_DASH    = 2
-SEQUENCIA_BOOST    = 10
-VEL_BOOST_KILLS    = 2
-CURA_QUANTIDADE    = 5
-DANO_FLASH_DUR     = 8
 
 
-# SPRITES ─────────────────────────────────────────────────────────────────────
+# SPRITES
 
 class Pato(pygame.sprite.Sprite):
     img_dir  = pygame.image.load("assets/Pato/pato_direito_1.png")
@@ -185,7 +204,7 @@ class Pato(pygame.sprite.Sprite):
     atk_esq = pygame.image.load("assets/Pato/pato_kat_esq.png")
 
     def __init__(self):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
         self.image = self.img_dir
         self.rect  = self.image.get_rect()
         self.rect.x = SP_x + SP_L // 2
@@ -261,6 +280,7 @@ class Pato(pygame.sprite.Sprite):
             self.anim_frame = 0
             self.image = self.img_dir if self.facing == "dir" else self.img_esq
 
+
 Pato_group = pygame.sprite.Group()
 pato = Pato()
 Pato_group.add(pato)
@@ -272,6 +292,7 @@ def aplicar_flash(sprite):
     sprite.image = flash
 
 
+#Galinha
 class Galinha(pygame.sprite.Sprite):
     frames_dir = [
         pygame.image.load("assets/Inimigos/galinha/galinha_walk_dir1.png"),
@@ -283,7 +304,7 @@ class Galinha(pygame.sprite.Sprite):
     ]
 
     def __init__(self, x, y):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
         self.image           = self.frames_dir[0]
         self.rect            = self.image.get_rect()
         self.rect.x          = x
@@ -317,19 +338,19 @@ class Galinha(pygame.sprite.Sprite):
             aplicar_flash(self)
             self.dano_flash -= 1
 
+
 Galinha_group = pygame.sprite.Group()
-for i in range(3):
-    Galinha_group.add(Galinha(SP_x + 60 + i * 130, SP_y + 60))
-for i in range(15):
-    Galinha_group.add(Galinha(SG_x + 80 + (i % 5) * 260, SG_y + 80 + (i // 5) * 200))
+for i in range(5):
+    Galinha_group.add(Galinha(SP_x + 60 + i *80, SP_y + 60))
 for i in range(10):
+    Galinha_group.add(Galinha(SG_x + 80 + (i % 5) * 260, SG_y + 80 + (i // 5) * 200))
+for i in range(7):
     Galinha_group.add(Galinha(SM_x + 80 + (i % 5) * 180, SM_y + 200 + (i // 5) * 200))
-for i in range(3):
-    Galinha_group.add(Galinha(SP2_x + 40 + (i % 5) * 80, SP2_y + 60 + (i // 5) * 100))
 for i in range(15):
-    Galinha_group.add(Galinha(SF_x + 80 + (i % 5) * 80, SF_y + 80 + (i // 5) * 100))
+    Galinha_group.add(Galinha(SF_x + 80 + (i % 5) * 300, SF_y + 80 + (i // 5) * 240))
 
 
+#Galo
 class Galo(pygame.sprite.Sprite):
     frames_walk_dir   = [
         pygame.image.load("assets/Inimigos/galo/galo_walk_dir1.png"),
@@ -349,7 +370,7 @@ class Galo(pygame.sprite.Sprite):
     ]
 
     def __init__(self, x, y):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
         self.image           = self.frames_walk_dir[0]
         self.rect            = self.image.get_rect()
         self.rect.x          = x
@@ -380,25 +401,26 @@ class Galo(pygame.sprite.Sprite):
             lista = self.frames_ataque_dir if self.facing == "dir" else self.frames_ataque_esq
         else:
             lista = self.frames_walk_dir if self.facing == "dir" else self.frames_walk_esq
-            if not movendo: self.anim_frame = 0
+            if not movendo:
+                self.anim_frame = 0
         self.image = lista[self.anim_frame]
         if self.dano_flash > 0:
             aplicar_flash(self)
             self.dano_flash -= 1
 
+
 Galo_group = pygame.sprite.Group()
-for i in range(4):
-    Galo_group.add(Galo(SP_x + 50 + i * 110, SP_y + 50))
-for i in range(25):
+for i in range(5):
+    Galo_group.add(Galo(SP_x + 50 + i *80, SP_y + 50))
+for i in range(15):
     Galo_group.add(Galo(SG_x + 120 + (i % 5) * 260, SG_y + 200 + (i // 5) * 180))
-for i in range(20):
+for i in range(10):
     Galo_group.add(Galo(SM_x + 100 + (i % 4) * 220, SM_y + 100 + (i // 4) * 120))
-for i in range(2):
-    Galo_group.add(Galo(SP2_x + 40 + (i % 4) * 100, SP2_y + 40 + (i // 4) * 80))
-for i in range(30):
-    Galo_group.add(Galo(SF_x + 40 + (i%4) * 300, SF_y + 40 + (i // 4) * 220))
+for i in range(20):
+    Galo_group.add(Galo(SF_x + 40 + (i % 4) * 300, SF_y + 40 + (i // 4) * 120))
 
 
+#Princesa
 class Princesa(pygame.sprite.Sprite):
     frames = [
         pygame.image.load("assets/Princesa/princesa_respiro1.png"),
@@ -407,14 +429,15 @@ class Princesa(pygame.sprite.Sprite):
     ]
 
     def __init__(self, x, y):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
         self.image      = self.frames[0]
         self.rect       = self.image.get_rect()
         self.rect.x     = x
         self.rect.y     = y
         self.anim_frame = 0
         self.anim_timer = 0
-        self.liberada = False
+        self.liberada   = False   # atributo de INSTÂNCIA — corrigido
+
     def atualizar_animacao(self):
         self.anim_timer += 1
         if self.anim_timer >= 20:
@@ -422,27 +445,31 @@ class Princesa(pygame.sprite.Sprite):
             self.anim_frame = (self.anim_frame + 1) % 3
         self.image = self.frames[self.anim_frame]
 
+
 Princesa_group = pygame.sprite.Group()
 Princesa_group.add(Princesa(SF_x + SF_L - 96, SF_y + SF_A // 2 - 32))
 
 
+#Item de cura
 class Cura(pygame.sprite.Sprite):
     img = pygame.image.load("assets/utensilios/cura.png")
 
     def __init__(self, x, y):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
         self.image  = self.img.copy()
         self.rect   = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
 
+
 cura_group = pygame.sprite.Group()
 cura_group.add(Cura(SP2_x + SP2_L // 2 - 16, SP2_y + SP2_A // 2 - 16))
 
 
+#Ovo
 class Ovo(pygame.sprite.Sprite):
     def __init__(self, x, y, alvo_x, alvo_y):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
         self.image = pygame.image.load("assets/OVO/Ovo2.png")
         self.rect  = self.image.get_rect()
         self.rect.center = (x, y)
@@ -451,11 +478,14 @@ class Ovo(pygame.sprite.Sprite):
         self.vel_x = dx / dist * 4
         self.vel_y = dy / dist * 4
 
-ovo_group = pygame.sprite.Group()
-tempo_ovo = 0
+
+ovo_group  = pygame.sprite.Group()
+tempo_ovo  = 0
 
 
-# HUD ─────────────────────────────────────────────────────────────────────────
+
+# HUD
+
 def desenhar_barra(surf, x, y, w, h, valor, maximo, cor, cor_fundo=(60, 60, 60)):
     pygame.draw.rect(surf, cor_fundo, (x, y, w, h))
     fill = int(w * max(0, valor) / maximo)
@@ -463,22 +493,23 @@ def desenhar_barra(surf, x, y, w, h, valor, maximo, cor, cor_fundo=(60, 60, 60))
         pygame.draw.rect(surf, cor, (x, y, fill, h))
     pygame.draw.rect(surf, (200, 200, 200), (x, y, w, h), 2)
 
+
 def desenhar_hud(surf, pato):
-    # vida
+    #Vida
     bw, bh = 200, 18
-    bx, by = 10, 10
+    bx, by = 14, 14
     desenhar_barra(surf, bx, by, bw, bh, pato.vida, pato.vida_max, (220, 50, 50))
     vida_txt = fonte_p.render(f"{pato.vida}/{pato.vida_max}", True, (255, 255, 255))
     surf.blit(vida_txt, (bx + bw + 6, by))
 
-    # dash cooldown
+    #Dash cooldown
     cd_txt = "Dash: PRONTO" if pato.dash_cooldown == 0 else f"Dash: {pato.dash_cooldown}"
-    surf.blit(fonte_p.render(cd_txt, True, (180, 220, 255)), (10, 34))
+    surf.blit(fonte_p.render(cd_txt, True, (180, 220, 255)), (bx, by + bh + 6))
 
-    # fúria (canto superior direito)
+    #Fúria
     fw, fh = 160, 14
-    fx = largura - fw - 10
-    fy = 10
+    fx = largura - fw - 14
+    fy = 14
     cor_furia = (255, 80, 0) if pato.furia_ativa else (220, 180, 0)
     desenhar_barra(surf, fx, fy, fw, fh,
                    pato.furia_timer if pato.furia_ativa else pato.furia_carga,
@@ -487,66 +518,227 @@ def desenhar_hud(surf, pato):
     label = "FÚRIA ATIVA!" if pato.furia_ativa else (
             "FÚRIA PRONTA![Q]" if pato.furia_carga >= 100 else f"Fúria {pato.furia_carga}/100")
     lbl_surf = fonte_p.render(label, True, cor_furia)
-    surf.blit(lbl_surf, (largura - lbl_surf.get_width() - 10, fy + fh + 2))
+    surf.blit(lbl_surf, (largura - lbl_surf.get_width() - 14, fy + fh + 2))
 
-    # sequência (abaixo da fúria, canto direito)
+    #Sequência de kills
     if pato.sequencia_kills > 0:
         sy_hud = fy + fh + 22
         cor_seq = (0, 220, 80) if pato.sequencia_kills >= SEQUENCIA_BOOST else (80, 180, 255)
         desenhar_barra(surf, fx, sy_hud, fw, 10,
                        min(pato.sequencia_kills, SEQUENCIA_BOOST), SEQUENCIA_BOOST, cor_seq)
-        seq_txt = f"Seq: {pato.sequencia_kills}" + ("  +VEL" if pato.sequencia_kills >= SEQUENCIA_BOOST else "")
+        seq_txt = (f"Seq: {pato.sequencia_kills}" +
+                   ("  +VEL" if pato.sequencia_kills >= SEQUENCIA_BOOST else ""))
         st = fonte_p.render(seq_txt, True, cor_seq)
-        surf.blit(st, (largura - st.get_width() - 10, sy_hud + 12))
+        surf.blit(st, (largura - st.get_width() - 14, sy_hud + 12))
+
+
+
+# DIÁLOGO, INDICADOR DE INTERAÇÃO E RESULTADOS
+
+dialogo_linhas = [
+    "Pato! Você derrotou todos os inimigos!",
+    "Eu sabia que você conseguiria...",
+    "Todos os peixes estão em divida com você.",
+    "Que seu bico seja lembrado para sempre!",
+]
+dialogo_index = 0
+
+fonte_dialogo   = pygame.font.SysFont('assets/Fonte/fonte.ttf', 34)
+fonte_dialogo_p = pygame.font.SysFont('assets/Fonte/fonte.ttf', 26)
+
+
+def desenhar_dialogo(surf, linha):
+#caixa de dialogo
+    box_w, box_h = largura - 80, 160
+    box_x        = 40
+    box_y        = altura - box_h - 20
+
+    #Fundo = aumentar tamanho
+    fundo = pygame.transform.scale(caixa_dialogo_img, (box_w, box_h))
+    surf.blit(fundo, (box_x, box_y))
+    pygame.draw.rect(surf, (255, 215, 0), (box_x, box_y, box_w, box_h), 2)
+
+    nome = fonte_dialogo_p.render("Princesa:", True, (255, 215, 0))
+    surf.blit(nome, (box_x + 14, box_y + 10))
+
+    max_w = box_w - 28
+    palavras = linha.split()
+    linhas_render, linha_atual = [], ""
+    for p in palavras:
+        teste = linha_atual + (" " if linha_atual else "") + p
+        if fonte_dialogo.size(teste)[0] <= max_w:
+            linha_atual = teste
+        else:
+            linhas_render.append(linha_atual)
+            linha_atual = p
+    if linha_atual:
+        linhas_render.append(linha_atual)
+    for i, l in enumerate(linhas_render):
+        txt = fonte_dialogo.render(l, True, (255, 255, 255))
+        surf.blit(txt, (box_x + 14, box_y + 38 + i * 34))
+
+    dica = fonte_dialogo_p.render("[ ENTER ] Continuar", True, (230, 230, 230))
+    surf.blit(dica, (box_x + box_w - dica.get_width() - 10, box_y + box_h - 24))
+
+
+def desenhar_indicador_interacao(surf):
+#caixa para indicador pressionar E
+    box_w, box_h = 260, 70
+    box_x = largura // 2 - box_w // 2
+    box_y = altura - box_h - 30
+
+    fundo = pygame.transform.scale(caixa_dialogo_img, (box_w, box_h))
+    surf.blit(fundo, (box_x, box_y))
+    pygame.draw.rect(surf, (255, 215, 0), (box_x, box_y, box_w, box_h), 2)
+
+    txt = fonte_dialogo.render("Pressione E para conversar", True, (255, 255, 255))
+    surf.blit(txt, (box_x + box_w // 2 - txt.get_width() // 2,
+                     box_y + box_h // 2 - txt.get_height() // 2))
+
+
+def desenhar_resultados(surf, pato, tempo_ms, pontos):
+    surf.fill((10, 10, 30))
+
+    titulo = fonte.render("MISSÃO CONCLUÍDA!", True, (255, 215, 0))
+    surf.blit(titulo, (largura // 2 - titulo.get_width() // 2, 120))
+    pygame.draw.line(surf, (255, 215, 0), (100, 165), (largura - 100, 165), 1)
+
+    segundos  = tempo_ms // 1000
+    minutos   = segundos // 60
+    seg_rest  = segundos % 60
+    t = fonte.render(f"Tempo:  {minutos:02d}:{seg_rest:02d}", True, (180, 220, 255))
+    surf.blit(t, (largura // 2 - t.get_width() // 2, 200))
+
+    kills = fonte.render(f"Inimigos derrotados:  {total_inimigos}", True, (255, 255, 255))
+    surf.blit(kills, (largura // 2 - kills.get_width() // 2, 250))
+
+    vida_txt = fonte.render(f"Vida restante:  {pato.vida}/{pato.vida_max}", True, (220, 80, 80))
+    surf.blit(vida_txt, (largura // 2 - vida_txt.get_width() // 2, 300))
+
+    pygame.draw.line(surf, (255, 215, 0), (100, 345), (largura - 100, 345), 1)
+    pts = fonte.render(f"PONTUAÇÃO:  {pontos}", True, (255, 215, 0))
+    surf.blit(pts, (largura // 2 - pts.get_width() // 2, 360))
+
+    sair = fonte_p.render("Pressione ESC para sair", True, (150, 150, 150))
+    surf.blit(sair, (largura // 2 - sair.get_width() // 2, 440))
+
+
+
+# MENU E INTRO
 
 resultado = menu(tela, clock)
-
 if resultado == "intro":
     intro(tela, clock)
 
+pygame.mixer.music.load('assets/Musica/Musica_fundo-192kbps.mp3')
+pygame.mixer.music.play(-1)
+pygame.mixer.music.set_volume(0.2)
 
-# LOOP PRINCIPAL ──────────────────────────────────────────────────────────────
+
+# ESTADOS E VARIÁVEIS DO LOOP
+
+estado          = "jogando"   # "jogando" | "dialogo" | "resultados"
+tempo_inicio    = pygame.time.get_ticks()
+tempo_final_ms  = 0
+pontuacao_total = 0
+total_inimigos  = len(Galinha_group) + len(Galo_group)
+rodando         = True
+
+# Câmera
+cam_x = max(0, min(pato.rect.centerx - largura    // 2, largura_mundo - largura))
+cam_y = max(0, min(pato.rect.centery - altura_jogo // 2, altura_mundo - altura_jogo))
+
+
+
+# LOOP PRINCIPAL
+
 while rodando:
 
-    # 1. Eventos
+    #1. Eventos
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             rodando = False
 
-    if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-        if Princesa.liberada:
-            if pato.rect.colliderect(Princesa.rect):
-                estado = "dialogo"
-
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_l:
-                if pato.ataque_cooldown == 0:
-                    pato.ataque_timer    = 10
-                    pato.ataque_cooldown = 40
 
-            if event.key == pygame.K_SPACE:
-                cd = DASH_COOLDOWN_FUR if pato.furia_ativa else DASH_COOLDOWN_NORM
-                if pato.dash_cooldown == 0:
-                    pato.dash_cooldown = cd
-                    pato.dash_timer    = DASH_DURACAO
-                    pato.dash_vx       = pato.ultima_dir_x * DASH_FORCA
-                    pato.dash_vy       = pato.ultima_dir_y * DASH_FORCA
+            # Estado: diálogo
+            if estado == "dialogo":
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    dialogo_index += 1
+                    if dialogo_index >= len(dialogo_linhas):
+                        tempo_final_ms   = pygame.time.get_ticks() - tempo_inicio
+                        segundos_jogados = tempo_final_ms // 1000
+                        bonus_tempo      = max(0, 3000 - segundos_jogados) * 2
+                        bonus_vida       = pato.vida * 100
+                        pontuacao_total  = total_inimigos * 50 + bonus_vida + bonus_tempo
+                        estado = "resultados"
 
-            if event.key == pygame.K_q:
-                pato.ativar_furia()
+            # Estado: resultados
+            elif estado == "resultados":
+                if event.key == pygame.K_ESCAPE:
+                    rodando = False
 
-    # 2. Cooldowns
+            # Estado: jogando
+            elif estado == "jogando":
+                if event.key == pygame.K_e:
+                    for princesa in Princesa_group:
+                        if (princesa.liberada and
+                                pato.rect.colliderect(princesa.rect.inflate(60, 60))):
+                            estado = "dialogo"
+                            dialogo_index = 0
+
+                if event.key == pygame.K_l:
+                    if pato.ataque_cooldown == 0:
+                        pato.ataque_timer    = 10
+                        pato.ataque_cooldown = 40
+
+                if event.key == pygame.K_SPACE:
+                    cd = DASH_COOLDOWN_FUR if pato.furia_ativa else DASH_COOLDOWN_NORM
+                    if pato.dash_cooldown == 0:
+                        pato.dash_cooldown = cd
+                        pato.dash_timer    = DASH_DURACAO
+                        pato.dash_vx       = pato.ultima_dir_x * DASH_FORCA
+                        pato.dash_vy       = pato.ultima_dir_y * DASH_FORCA
+
+                if event.key == pygame.K_q:
+                    pato.ativar_furia()
+
+    #Estado: diálogo (renderiza cenário e caixa de fala)
+    if estado == "dialogo":
+        tela.fill((0, 0, 0))
+        tela.blit(chao_surface, (0, 0), (cam_x, cam_y, largura, altura_jogo))
+        for m in muro_group:
+            sx, sy = m.rect.x - cam_x, m.rect.y - cam_y
+            if -AZULEJO < sx < largura and -AZULEJO < sy < altura_jogo:
+                tela.blit(m.image, (sx, sy))
+        for p in Princesa_group:
+            tela.blit(p.image, (p.rect.x - cam_x, p.rect.y - cam_y))
+        tela.blit(pato.image, (pato.rect.x - cam_x, pato.rect.y - cam_y))
+        desenhar_hud(tela, pato)
+        desenhar_dialogo(tela, dialogo_linhas[dialogo_index])
+        pygame.display.flip()
+        clock.tick(60)
+        continue
+
+    #Estado: resultados
+    if estado == "resultados":
+        desenhar_resultados(tela, pato, tempo_final_ms, pontuacao_total)
+        pygame.display.flip()
+        clock.tick(60)
+        continue
+
+    #2. Cooldowns e timers
     if pato.ataque_cooldown > 0: pato.ataque_cooldown -= 1
     if pato.dash_cooldown   > 0: pato.dash_cooldown   -= 1
     pato.atualizar_furia()
 
-    # 2b. Ataque
+    #2b. Ataque
     if pato.ataque_timer > 0:
         area = pygame.Rect(pato.rect.centerx - 50, pato.rect.centery - 50, 100, 100)
         for galinha in list(Galinha_group):
             if area.colliderect(galinha.rect):
-                galinha.vida       -= 1
-                galinha.dano_flash  = DANO_FLASH_DUR
+                galinha.vida      -= 1
+                galinha.dano_flash = DANO_FLASH_DUR
                 dx = galinha.rect.centerx - pato.rect.centerx
                 dy = galinha.rect.centery - pato.rect.centery
                 dist = (dx**2 + dy**2) ** 0.5 or 1
@@ -557,8 +749,8 @@ while rodando:
                     galinha.kill(); pato.registrar_kill()
         for galo in list(Galo_group):
             if area.colliderect(galo.rect):
-                galo.vida       -= 1
-                galo.dano_flash  = DANO_FLASH_DUR
+                galo.vida      -= 1
+                galo.dano_flash = DANO_FLASH_DUR
                 dx = galo.rect.centerx - pato.rect.centerx
                 dy = galo.rect.centery - pato.rect.centery
                 dist = (dx**2 + dy**2) ** 0.5 or 1
@@ -569,17 +761,17 @@ while rodando:
                     galo.kill(); pato.registrar_kill()
         pato.ataque_timer -= 1
 
-    # 3. Imunidade
+    #3. Imunidade
     if pato.invensivel > 0: pato.invensivel -= 1
 
-    # 4. Movimento pato
+    #4. Movimento do pato
     tecla = pygame.key.get_pressed()
     vx = vy = 0
     spd = pato.vel_atual()
-    if tecla[pygame.K_d] or tecla[pygame.K_RIGHT]:  vx =  spd; pato.facing = "dir"
-    if tecla[pygame.K_a] or tecla[pygame.K_LEFT]:   vx = -spd; pato.facing = "esq"
-    if tecla[pygame.K_w] or tecla[pygame.K_UP]:     vy = -spd
-    if tecla[pygame.K_s] or tecla[pygame.K_DOWN]:   vy =  spd
+    if tecla[pygame.K_d] or tecla[pygame.K_RIGHT]: vx =  spd; pato.facing = "dir"
+    if tecla[pygame.K_a] or tecla[pygame.K_LEFT]:  vx = -spd; pato.facing = "esq"
+    if tecla[pygame.K_w] or tecla[pygame.K_UP]:    vy = -spd
+    if tecla[pygame.K_s] or tecla[pygame.K_DOWN]:  vy =  spd
 
     movendo_pato = vx != 0 or vy != 0
     if movendo_pato:
@@ -616,10 +808,10 @@ while rodando:
             pato.vel_x = pato.vel_y = 0
             break
 
-    pato.rect.left   = max(0, pato.rect.left)
+    pato.rect.left   = max(0,             pato.rect.left)
     pato.rect.right  = min(largura_mundo, pato.rect.right)
-    pato.rect.top    = max(0, pato.rect.top)
-    pato.rect.bottom = min(altura_mundo, pato.rect.bottom)
+    pato.rect.top    = max(0,             pato.rect.top)
+    pato.rect.bottom = min(altura_mundo,  pato.rect.bottom)
 
     pato.atualizar_animacao(movendo_pato, pato.ataque_timer > 0)
 
@@ -639,11 +831,11 @@ while rodando:
                 if galo.vida <= 0:
                     galo.kill(); pato.registrar_kill()
 
-    # 5. Câmera
-    cam_x = max(0, min(pato.rect.centerx - largura // 2, largura_mundo - largura))
-    cam_y = max(0, min(pato.rect.centery - altura  // 2, altura_mundo  - altura))
+    #5. Câmera
+    cam_x = max(0, min(pato.rect.centerx - largura    // 2, largura_mundo - largura))
+    cam_y = max(0, min(pato.rect.centery - altura_jogo // 2, altura_mundo - altura_jogo))
 
-    # 6. Galinhas
+    #6. Galinhas
     for galinha in Galinha_group:
         if galinha.vida <= 0: galinha.kill(); pato.registrar_kill(); continue
         dx = pato.rect.centerx - galinha.rect.centerx
@@ -688,14 +880,14 @@ while rodando:
                 galinha.rect.x, galinha.rect.y = galinha_x, galinha_y
                 galinha.vel_x = galinha.vel_y = 0; break
 
-        galinha.rect.left   = max(0, galinha.rect.left)
+        galinha.rect.left   = max(0,             galinha.rect.left)
         galinha.rect.right  = min(largura_mundo, galinha.rect.right)
-        galinha.rect.top    = max(0, galinha.rect.top)
-        galinha.rect.bottom = min(altura_mundo, galinha.rect.bottom)
+        galinha.rect.top    = max(0,             galinha.rect.top)
+        galinha.rect.bottom = min(altura_mundo,  galinha.rect.bottom)
         movendo = abs(galinha.vel_x) > 0.5 or abs(move_dx) > 0
         galinha.atualizar_animacao(movendo, move_dx if move_dx != 0 else galinha.vel_x)
 
-    # 7. Galos
+    #7. Galos
     for galo in Galo_group:
         if galo.vida <= 0: galo.kill(); pato.registrar_kill(); continue
         dx = pato.rect.centerx - galo.rect.centerx
@@ -735,10 +927,10 @@ while rodando:
                 galo.rect.x, galo.rect.y = galo_x, galo_y
                 galo.vel_x = galo.vel_y = 0; break
 
-        galo.rect.left   = max(0, galo.rect.left)
+        galo.rect.left   = max(0,             galo.rect.left)
         galo.rect.right  = min(largura_mundo, galo.rect.right)
-        galo.rect.top    = max(0, galo.rect.top)
-        galo.rect.bottom = min(altura_mundo, galo.rect.bottom)
+        galo.rect.top    = max(0,             galo.rect.top)
+        galo.rect.bottom = min(altura_mundo,  galo.rect.bottom)
         movendo = abs(galo.vel_x) > 0.5 or abs(move_dx) > 0
         galo.atualizar_animacao(movendo, move_dx if move_dx != 0 else galo.vel_x, atacando)
 
@@ -752,7 +944,7 @@ while rodando:
             pato.vel_y = ky / kdist * KB_PATO
             for g in Galo_group: g.tempo_recuo = 60
 
-    # 8. Ovos
+    #8. Ovos
     for ovo in ovo_group:
         ovo.rect.x += ovo.vel_x; ovo.rect.y += ovo.vel_y
         if pato.rect.colliderect(ovo.rect):
@@ -792,22 +984,48 @@ while rodando:
             cura.kill()
 
     # 10. Princesa
-    for p in Princesa_group: p.atualizar_animacao()
-
-    if pato.vida <= 0: rodando = False
+    for p in Princesa_group:
+        p.atualizar_animacao()
 
     if len(Galinha_group) == 0 and len(Galo_group) == 0:
-        Princesa.liberada = True
+        for p in Princesa_group:
+            p.liberada = True
 
-    # 11. Renderização
+    # Verificar pato perto da princesa liberta
+    mostrar_indicador = False
+    for p in Princesa_group:
+        if p.liberada:
+            dx = pato.rect.centerx - p.rect.centerx
+            dy = pato.rect.centery - p.rect.centery
+            dist = (dx**2 + dy**2) ** 0.5
+            if dist <= DIST_INTERACAO_PRINCESA:
+                mostrar_indicador = True
+                break
+
+    #Checar morte pato
+    if pato.vida <= 0:
+        resultado_go = game_over(tela, clock)
+        if resultado_go == "reiniciar":
+            import os
+            pygame.quit()
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        else:
+            rodando = False
+        continue
+
+    #11. Renderização
     tela.fill((0, 0, 0))
-    tela.blit(chao_surface, (0, 0), (cam_x, cam_y, largura, altura))
 
+    # Chão
+    tela.blit(chao_surface, (0, 0), (cam_x, cam_y, largura, altura_jogo))
+
+    # Muros
     for m in muro_group:
         sx, sy = m.rect.x - cam_x, m.rect.y - cam_y
-        if -AZULEJO < sx < largura and -AZULEJO < sy < altura:
+        if -AZULEJO < sx < largura and -AZULEJO < sy < altura_jogo:
             tela.blit(m.image, (sx, sy))
 
+    # Sprites
     for c in cura_group:
         tela.blit(c.image, (c.rect.x - cam_x, c.rect.y - cam_y))
     for galinha in Galinha_group:
@@ -819,6 +1037,7 @@ while rodando:
     for p in Princesa_group:
         tela.blit(p.image, (p.rect.x - cam_x, p.rect.y - cam_y))
 
+    # Pato (efeito de dash ou pisca pisca)
     if pato.em_dash():
         dash_img = pato.image.copy()
         dash_img.fill((100, 180, 255, 80), special_flags=pygame.BLEND_RGBA_ADD)
@@ -826,7 +1045,12 @@ while rodando:
     elif pato.invensivel == 0 or (pato.invensivel // 5) % 2 == 0:
         tela.blit(pato.image, (pato.rect.x - cam_x, pato.rect.y - cam_y))
 
+    # HUD no topo
     desenhar_hud(tela, pato)
+
+    # Indicador "Pressione E" perto da princesa
+    if mostrar_indicador:
+        desenhar_indicador_interacao(tela)
 
     pygame.display.flip()
     clock.tick(60)

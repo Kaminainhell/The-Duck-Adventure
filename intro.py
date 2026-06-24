@@ -8,7 +8,9 @@ BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
 
 pygame.font.init()
-fonte = pygame.font.SysFont(None, 36)
+fonte = pygame.font.Font('assets/Fonte/fonte.ttf', 30)
+
+
 
 def intro(tela, clock):
 
@@ -26,9 +28,11 @@ def intro(tela, clock):
 
     falas = [
         "Depois de uma longa viagem...",
-        "Duck finalmente encontrou a masmorra que tanto procurava.",
-        "Lá havia uma princesa aprisionada pelas malvadas galinhas.",
-        "Sua aventura para salva-la esta prestes a comecar."
+        "Duck finalmente o que tanto procurava.",
+        "Uma masmorra, mas não qualquer masmorra.",
+        "Era a masmorra das galinhas.",
+        "As galinhas haviam capturado uma princesa",
+        "E você, Duck, vai salva-la"
     ]
 
     fala_atual = 0
